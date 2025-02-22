@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stratium: AI-Powered Brainstorming and Collaboration</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="header">
+    <img src="./images/stratium final.png" alt="Logo" id="logo" />
+    <div id="doc-title-container">
+      <span id="doc-title" contenteditable="true">Untitled Document</span>
+    </div>
+  </div>
+
+  <div id="format-toolbar">
+    <button id="btn-bold" onclick="formatText('bold')"><strong>B</strong></button>
+    <button id="btn-italic" onclick="formatText('italic')"><em>I</em></button>
+    <button id="btn-underline" onclick="formatText('underline')"><u>U</u></button>
+    <button id="btn-ulist" onclick="formatText('insertUnorderedList')">• List</button>
+    <button id="btn-olist" onclick="formatText('insertOrderedList')">1. List</button>
+    <button onclick="formatText('justifyLeft')">Left</button>
+    <button onclick="formatText('justifyCenter')">Center</button>
+    <button onclick="formatText('justifyRight')">Right</button>
+    <button onclick="formatText('createLink', prompt('Enter URL:', 'https://'))">Link</button>
+  </div>
+
+  <div id="editor-container">
+    <div contenteditable="true" id="editor"></div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const io = require('socket.io-client');
+    const socket = io('http://localhost:3000');
+
+    let editor = document.getElementById('editor');
+    let title = document.getElementById('doc-title');
+    let isLocalEdit = false;
+    let editTimeout;
+
+    // Load saved document
+    ipcRenderer.invoke('load-document').then(content => {
+        if (content && content.trim() !== '') {
+            editor.innerHTML = content;
+        }
+    });
+
+    // WebSocket sync
+    socket.on('doc:sync', (content) => {
+        if (!isLocalEdit) {
+            editor.innerHTML = content;
+        }
+    });
+
+    // Input event for typing & autosave logic
+    editor.addEventListener('input', () => {
+        isLocalEdit = true;
+        clearTimeout(editTimeout);
+        editTimeout = setTimeout(() => {
+            socket.emit('doc:update', editor.innerHTML);
+            ipcRenderer.send('autosave-document', editor.innerHTML, title.innerText.trim());
+            isLocalEdit = false;
+        }, 300);
+    });
+
+    // Autosave every 2 seconds
+    setInterval(() => {
+        ipcRenderer.send('autosave-document', editor.innerHTML, title.innerText.trim());
+    }, 2000);
+  </script>
+</body>
+</html>

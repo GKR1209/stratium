@@ -1,0 +1,16 @@
+{
+    "name": "hackathon-app",
+    "version": "1.0.0",
+    "main": "main.js",
+    "devDependencies": {
+        "electron": "^34.2.0"
+    },
+    "scripts": {
+        "start": "electron ."
+    },
+    "dependencies": {
+        "express": "^4.21.2",
+        "socket.io": "^4.8.1",
+        "socket.io-client": "^4.8.1"
+    }
+}
