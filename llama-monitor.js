@@ -23,17 +23,16 @@ class LlamaMonitor {
     async analyzeContent(content) {
         if (!this.model) {
             console.error('Model not initialized');
-            return;
+            return { nextSteps: [], contradictions: [], references: [] };
         }
 
         try {
             const cleanContent = content.replace(/<[^>]*>/g, ' ').trim();
             if (!cleanContent) {
                 console.warn('⚠️ No content to analyze');
-                return;
+                return { nextSteps: [], contradictions: [], references: [] };
             }
 
-            
             console.log('📝 Analyzing content...');
 
             const prompt = `Given this document content: "${cleanContent.substring(0, 500)}"
@@ -62,11 +61,10 @@ class LlamaMonitor {
             const insights = this.extractInsights(result[0].generated_text);
             console.log('Generated insights:', insights);
 
-            if (insights.nextSteps.length > 0 || insights.contradictions.length > 0 || insights.references.length > 0) {
-                this.io.emit('llama:insights', insights);
-            }
+            return insights;
         } catch (error) {
             console.error('Analysis failed:', error);
+            return { nextSteps: [], contradictions: [], references: [] };
         }
     }
 

@@ -1,11 +1,14 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
+const bodyParser = require('body-parser');
 const LlamaMonitor = require('./llama-monitor');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
+
+app.use(bodyParser.json());
 
 let sharedDoc = "Start typing...";
 const llamaMonitor = new LlamaMonitor(io);
@@ -19,12 +22,8 @@ io.on('connection', (socket) => {
         console.log('📝 Document updated');
         sharedDoc = newContent;
         socket.broadcast.emit('doc:sync', sharedDoc);
-        
-        // Remove this line to disable automatic analysis
-        // await llamaMonitor.analyzeContent(newContent);
     });
 
-    // Update the generate:step event handler
     socket.on('generate:step', async (data) => {
         const content = await llamaMonitor.generateStepContent(data.step, data.currentContent);
         socket.emit('step:content', {
@@ -33,15 +32,25 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Add this to your existing socket.on connections
     socket.on('trigger:analysis', async (content) => {
         console.log('🔄 Manual analysis triggered');
         await llamaMonitor.analyzeContent(content);
     });
 
     socket.on('disconnect', () => {
-        // Handle disconnection if needed
+        console.log('👤 Client disconnected');
     });
+});
+
+app.post('/analyze', async (req, res) => {
+    const content = req.body.content;
+    try {
+        const insights = await llamaMonitor.analyzeContent(content);
+        res.json({ insights });
+    } catch (error) {
+        console.error('Analysis failed:', error);
+        res.status(500).json({ error: 'Analysis failed' });
+    }
 });
 
 server.listen(3000, () => {
