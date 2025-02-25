@@ -1,32 +1,49 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
+const LlamaMonitor = require('./llama-monitor');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
 let sharedDoc = "Start typing...";
-let cursorPositions = {};
+const llamaMonitor = new LlamaMonitor(io);
+console.log('🚀 Collab server starting...');
 
 io.on('connection', (socket) => {
-  socket.emit('doc:sync', sharedDoc);
-  socket.emit('cursor:sync', cursorPositions);
+    console.log('👤 New client connected');
+    socket.emit('doc:sync', sharedDoc);
 
-  socket.on('doc:update', (newContent) => {
-    sharedDoc = newContent;
-    socket.broadcast.emit('doc:sync', sharedDoc);
-  });
+    socket.on('doc:update', async (newContent) => {
+        console.log('📝 Document updated');
+        sharedDoc = newContent;
+        socket.broadcast.emit('doc:sync', sharedDoc);
+        
+        // Remove this line to disable automatic analysis
+        // await llamaMonitor.analyzeContent(newContent);
+    });
 
-  socket.on('cursor:update', (cursorData) => {
-    cursorPositions[cursorData.userId] = cursorData.cursorOffset;
-    socket.broadcast.emit('cursor:update', cursorData);
-  });
+    // Update the generate:step event handler
+    socket.on('generate:step', async (data) => {
+        const content = await llamaMonitor.generateStepContent(data.step, data.currentContent);
+        socket.emit('step:content', {
+            step: data.step,
+            content: content || `Failed to generate content for: ${data.step}`
+        });
+    });
 
-  socket.on('disconnect', () => {
-    delete cursorPositions[socket.id];
-    socket.broadcast.emit('cursor:remove', socket.id);
-  });
+    // Add this to your existing socket.on connections
+    socket.on('trigger:analysis', async (content) => {
+        console.log('🔄 Manual analysis triggered');
+        await llamaMonitor.analyzeContent(content);
+    });
+
+    socket.on('disconnect', () => {
+        // Handle disconnection if needed
+    });
 });
 
-server.listen(3000);
+server.listen(3000, () => {
+    console.log('Collab server running on port 3000');
+});

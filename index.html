@@ -29,6 +29,23 @@
     <div contenteditable="true" id="editor"></div>
   </div>
 
+  <div id="llama-insights-panel" class="insights-panel">
+    <div class="insights-header">
+      <h3>🦙 Llama Insights</h3>
+    </div>
+    <div class="insights-content">
+      <div id="next-steps" class="insight-section">
+        <div class="insights-header-actions">
+          <h4>Next Steps</h4>
+          <button id="analyze-btn" onclick="triggerAnalysis()" class="analyze-button">
+            🔄 Analyze Document
+          </button>
+        </div>
+        <div class="steps-list"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const { ipcRenderer } = require('electron');
     const io = require('socket.io-client');
@@ -68,6 +85,77 @@
     setInterval(() => {
         ipcRenderer.send('autosave-document', editor.innerHTML, title.innerText.trim());
     }, 2000);
+
+    // Add this to your existing script
+    socket.on('llama:insights', (insights) => {
+        updateInsightsPanel(insights);
+    });
+
+    function updateInsightsPanel(insights) {
+        const stepsList = document.querySelector('.steps-list');
+        if (insights && insights.nextSteps) {
+            const stepsHtml = insights.nextSteps
+                .map(step => `
+                    <div class="step-item" onclick="addStepToDocument('${step.replace(/'/g, "\\'")}')">
+                        ▶️ ${step}
+                    </div>
+                `)
+                .join('');
+            stepsList.innerHTML = stepsHtml;
+        }
+    }
+
+    async function addStepToDocument(step) {
+        const editor = document.getElementById('editor');
+        
+        // Show loading state
+        const loadingHtml = `
+            <div class="loading-step">
+                <h3>✍️ Generating content for: ${step}</h3>
+                <div class="loading-indicator">🔄 Processing...</div>
+            </div>
+        `;
+        editor.innerHTML += loadingHtml;
+        
+        // Request content generation
+        socket.emit('generate:step', {
+            step: step,
+            currentContent: editor.innerHTML
+        });
+    }
+
+    // Add this socket listener
+    socket.on('step:content', (response) => {
+        const editor = document.getElementById('editor');
+        const loading = document.querySelector('.loading-step');
+        if (loading) loading.remove();
+        
+        if (response.content) {
+            const stepHTML = `
+                <div class="generated-step">
+                    <h3>📝 ${response.step}</h3>
+                    <div class="step-content">${response.content}</div>
+                    <div class="step-meta">Generated: ${new Date().toLocaleString()}</div>
+                </div>
+            `;
+            editor.innerHTML += stepHTML;
+            socket.emit('doc:update', editor.innerHTML);
+        }
+        ipcRenderer.send('autosave-document', editor.innerHTML, title.innerText.trim());
+    });
+
+    async function triggerAnalysis() {
+        const analyzeBtn = document.getElementById('analyze-btn');
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerHTML = '🔄 Analyzing...';
+        
+        socket.emit('trigger:analysis', editor.innerHTML);
+        
+        setTimeout(() => {
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = '🔄 Analyze Document';
+        }, 3000);
+    }
   </script>
 </body>
 </html>

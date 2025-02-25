@@ -20,6 +20,7 @@ function createWindow() {
     });
 
     mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    mainWindow.webContents.openDevTools(); // Add this line after mainWindow.loadFile()
 
     mainWindow.on('closed', () => {
         mainWindow = null;
