@@ -8,7 +8,6 @@
     "scripts": {
         "start": "electron .",
         "debug": "electron . --trace-warnings"
-
     },
     "dependencies": {
         "@xenova/transformers": "^2.17.2",

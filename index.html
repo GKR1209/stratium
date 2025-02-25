@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Stratium: AI-Powered Brainstorming and Collaboration</title>
   <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 </head>
 <body>
   <div id="header">
@@ -37,7 +38,7 @@
       <div id="next-steps" class="insight-section">
         <div class="insights-header-actions">
           <h4>Next Steps</h4>
-          <button id="analyze-btn" onclick="triggerAnalysis()" class="analyze-button">
+          <button id="analyze-btn" onclick=triggerAnalysis() class="analyze-button">
             🔄 Analyze Document
           </button>
         </div>
@@ -48,7 +49,6 @@
 
   <script>
     const { ipcRenderer } = require('electron');
-    const io = require('socket.io-client');
     const socket = io('http://localhost:3000');
 
     let editor = document.getElementById('editor');
@@ -146,11 +146,20 @@
 
     async function triggerAnalysis() {
         const analyzeBtn = document.getElementById('analyze-btn');
+        const editor = document.getElementById('editor');
+        
+        console.log('🔄 Triggering analysis...');
         analyzeBtn.disabled = true;
         analyzeBtn.innerHTML = '🔄 Analyzing...';
         
+        // Clear existing steps
+        document.querySelector('.steps-list').innerHTML = 
+            '<div class="loading-steps">Analyzing with Llama...</div>';
+        
+        // Trigger analysis
         socket.emit('trigger:analysis', editor.innerHTML);
         
+        // Re-enable button after delay
         setTimeout(() => {
             analyzeBtn.disabled = false;
             analyzeBtn.innerHTML = '🔄 Analyze Document';

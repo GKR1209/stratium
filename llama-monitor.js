@@ -1,88 +1,108 @@
 const natural = require('natural');
-const transformers = require('@xenova/transformers');
+const { pipeline } = require('@xenova/transformers');
+const axios = require('axios');
 
 class LlamaMonitor {
     constructor(io) {
         this.io = io;
         this.tokenizer = new natural.WordTokenizer();
-        this.lastAnalysis = Date.now();
-        this.analysisDelay = 2000;
         this.model = null;
         this.initialize();
     }
 
     async initialize() {
         try {
-            console.log('🦙 Initializing model...');
-            this.model = await transformers.pipeline('text-generation', 'Xenova/distilgpt2');
-            console.log('✅ Model initialized');
+            console.log('🦙 Initializing Llama model...');
+            this.model = await pipeline('text-generation', 'TheBloke/Llama-2-7B-GGUF');
+            console.log('✅ Llama model initialized successfully');
         } catch (error) {
             console.error('❌ Model initialization failed:', error);
         }
     }
 
     async analyzeContent(content) {
-        console.log('shit works');
-        if (!this.model) return;
-        
+        if (!this.model) {
+            console.error('Model not initialized');
+            return;
+        }
+
         try {
             const cleanContent = content.replace(/<[^>]*>/g, ' ').trim();
-            if (!cleanContent) return;
+            if (!cleanContent) {
+                console.warn('⚠️ No content to analyze');
+                return;
+            }
 
+            
             console.log('📝 Analyzing content...');
 
             const prompt = `Given this document content: "${cleanContent.substring(0, 500)}"
 
-            Suggest 3 specific improvements or next steps to enhance this document.
-            Format as:
+            Generate 3 specific and actionable next steps to improve this document.
+            Highlight any potential contradictions.
+            Suggest relevant research articles or references.
+            Format your response exactly as:
             NEXT_STEPS:
-            - [specific improvement]
-            - [specific improvement]
-            - [specific improvement]`;
+            - [detailed step 1]
+            - [detailed step 2]
+            - [detailed step 3]
+            CONTRADICTIONS:
+            - [contradiction 1]
+            - [contradiction 2]
+            REFERENCES:
+            - [reference 1]
+            - [reference 2]`;
 
             const result = await this.model(prompt, {
-                max_new_tokens: 150,
-                temperature: 0.7
+                max_new_tokens: 300,
+                temperature: 0.7,
+                top_p: 0.95
             });
 
-            const nextSteps = this.extractSteps(result[0].generated_text);
-            console.log('Generated steps:', nextSteps);
-            
-            if (nextSteps.length > 0) {
-                this.io.emit('llama:insights', { nextSteps });
+            const insights = this.extractInsights(result[0].generated_text);
+            console.log('Generated insights:', insights);
+
+            if (insights.nextSteps.length > 0 || insights.contradictions.length > 0 || insights.references.length > 0) {
+                this.io.emit('llama:insights', insights);
             }
         } catch (error) {
             console.error('Analysis failed:', error);
         }
     }
 
-    async generateStepContent(step) {
-        if (!this.model) return null;
+    extractInsights(text) {
+        const nextStepsSection = text.split('NEXT_STEPS:')[1] || '';
+        const contradictionsSection = text.split('CONTRADICTIONS:')[1] || '';
+        const referencesSection = text.split('REFERENCES:')[1] || '';
+
+        const nextSteps = (nextStepsSection.match(/- .+/g) || []).map(item => item.replace('- ', '').trim()).slice(0, 3);
+        const contradictions = (contradictionsSection.match(/- .+/g) || []).map(item => item.replace('- ', '').trim()).slice(0, 3);
+        const references = (referencesSection.match(/- .+/g) || []).map(item => item.replace('- ', '').trim()).slice(0, 3);
+
+        return { nextSteps, contradictions, references };
+    }
+
+    async generateStepContent(step, currentContent) {
+        if (!this.model) {
+            console.error('Model not initialized');
+            return '';
+        }
 
         try {
-            const prompt = `Create detailed content for this improvement: "${step}"
-            Make it specific and actionable.
-            Keep it under 200 words.`;
+            const prompt = `Given this document content: "${currentContent.substring(0, 500)}"
+            Generate detailed content for the following step: "${step}"`;
 
             const result = await this.model(prompt, {
                 max_new_tokens: 200,
-                temperature: 0.7
+                temperature: 0.7,
+                top_p: 0.95
             });
 
             return result[0].generated_text.trim();
         } catch (error) {
-            console.error('Step generation failed:', error);
-            return null;
+            console.error('Content generation failed:', error);
+            return '';
         }
-    }
-
-    extractSteps(text) {
-        const stepsSection = text.split('NEXT_STEPS:')[1] || '';
-        const items = stepsSection.match(/- .+/g) || [];
-        return items
-            .map(item => item.replace('- ', '').trim())
-            .filter(step => step.length > 0)
-            .slice(0, 3);
     }
 }
 

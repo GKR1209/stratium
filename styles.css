@@ -203,15 +203,17 @@ body {
     background: #f0f7ff;
     color: #1e40af;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
 .step-item:hover {
     background: #e1effe;
+    transform: translateX(4px);
 }
 
-.loading-step {
-    padding: 16px;
+.added-step {
     margin: 16px 0;
+    padding: 12px;
     background: #f8f9fa;
     border-left: 4px solid #1976d2;
 }
@@ -222,7 +224,13 @@ body {
     animation: spin 2s linear infinite;
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+
+/* Add to your existing styles */
+.loading-steps {
+    padding: 12px;
+    color: #666;
+    text-align: center;
+    background: #f5f5f5;
+    border-radius: 4px;
+    margin: 8px 0;
 }
