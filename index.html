@@ -1,161 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Stratium: AI-Powered Brainstorming and Collaboration</title>
-  <link rel="stylesheet" href="./styles.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GroupFlow</title>
+    <script src="https://kit.fontawesome.com/8437978e9b.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .icon-button {
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            top: 40px;
+            left: 0;
+            background-color: white;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .dropdown-content button {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            border: none;
+            background-color: #f1f1f1;
+            cursor: pointer;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+
+        .dropdown-content button:hover {
+            background-color: #ddd;
+        }
+    </style>
 </head>
 <body>
-  <div id="header">
-    <img src="./images/stratium final.png" alt="Logo" id="logo" />
-    <div id="doc-title-container">
-      <span id="doc-title" contenteditable="true">Untitled Document</span>
-    </div>
-  </div>
+    <div class="dropdown">
+        <!-- Icon button -->
+        <button class="icon-button" id="iconButton">
+            <i class="fa-solid fa-brain" style="color: #F88379"></i> 
+        </button>
 
-  <div id="format-toolbar">
-    <button id="btn-bold" onclick="formatText('bold')"><strong>B</strong></button>
-    <button id="btn-italic" onclick="formatText('italic')"><em>I</em></button>
-    <button id="btn-underline" onclick="formatText('underline')"><u>U</u></button>
-    <button id="btn-ulist" onclick="formatText('insertUnorderedList')">• List</button>
-    <button id="btn-olist" onclick="formatText('insertOrderedList')">1. List</button>
-    <button onclick="formatText('justifyLeft')">Left</button>
-    <button onclick="formatText('justifyCenter')">Center</button>
-    <button onclick="formatText('justifyRight')">Right</button>
-    <button onclick="formatText('createLink', prompt('Enter URL:', 'https://'))">Link</button>
-  </div>
-
-  <div id="editor-container">
-    <div contenteditable="true" id="editor"></div>
-  </div>
-
-  <div id="llama-insights-panel" class="insights-panel">
-    <div class="insights-header">
-      <h3>🦙 Llama Insights</h3>
-    </div>
-    <div class="insights-content">
-      <div id="next-steps" class="insight-section">
-        <div class="insights-header-actions">
-          <h4>Next Steps</h4>
-          <button id="analyze-btn" onclick="triggerAnalysis()" class="analyze-button">
-            🔄 Analyze Document
-          </button>
+        <!-- Dropdown menu -->
+        <div class="dropdown-content" id="dropdownMenu">
+            <button onclick="optionClicked(1)">Option 1</button>
+            <button onclick="optionClicked(2)">Option 2</button>
+            <button onclick="optionClicked(3)">Option 3</button>
         </div>
-        <div class="steps-list"></div>
-      </div>
     </div>
-  </div>
 
-  <script>
-    const { ipcRenderer } = require('electron');
-    const io = require('socket.io-client');
-    const socket = io('http://localhost:3000');
-
-    let editor = document.getElementById('editor');
-    let title = document.getElementById('doc-title');
-    let isLocalEdit = false;
-    let editTimeout;
-
-    // Load saved document
-    ipcRenderer.invoke('load-document').then(content => {
-        if (content && content.trim() !== '') {
-            editor.innerHTML = content;
-        }
-    });
-
-    // WebSocket sync
-    socket.on('doc:sync', (content) => {
-        if (!isLocalEdit) {
-            editor.innerHTML = content;
-        }
-    });
-
-    // Input event for typing & autosave logic
-    editor.addEventListener('input', () => {
-        isLocalEdit = true;
-        clearTimeout(editTimeout);
-        editTimeout = setTimeout(() => {
-            socket.emit('doc:update', editor.innerHTML);
-            ipcRenderer.send('autosave-document', editor.innerHTML, title.innerText.trim());
-            isLocalEdit = false;
-        }, 300);
-    });
-
-    // Autosave every 2 seconds
-    setInterval(() => {
-        ipcRenderer.send('autosave-document', editor.innerHTML, title.innerText.trim());
-    }, 2000);
-
-    // Add this to your existing script
-    socket.on('llama:insights', (insights) => {
-        updateInsightsPanel(insights);
-    });
-
-    function updateInsightsPanel(insights) {
-        const stepsList = document.querySelector('.steps-list');
-        if (insights && insights.nextSteps) {
-            const stepsHtml = insights.nextSteps
-                .map(step => `
-                    <div class="step-item" onclick="addStepToDocument('${step.replace(/'/g, "\\'")}')">
-                        ▶️ ${step}
-                    </div>
-                `)
-                .join('');
-            stepsList.innerHTML = stepsHtml;
-        }
-    }
-
-    async function addStepToDocument(step) {
-        const editor = document.getElementById('editor');
-        
-        // Show loading state
-        const loadingHtml = `
-            <div class="loading-step">
-                <h3>✍️ Generating content for: ${step}</h3>
-                <div class="loading-indicator">🔄 Processing...</div>
-            </div>
-        `;
-        editor.innerHTML += loadingHtml;
-        
-        // Request content generation
-        socket.emit('generate:step', {
-            step: step,
-            currentContent: editor.innerHTML
+    <script>
+        document.getElementById("iconButton").addEventListener("click", function () {
+            var dropdown = document.getElementById("dropdownMenu");
+            dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
         });
-    }
 
-    // Add this socket listener
-    socket.on('step:content', (response) => {
-        const editor = document.getElementById('editor');
-        const loading = document.querySelector('.loading-step');
-        if (loading) loading.remove();
-        
-        if (response.content) {
-            const stepHTML = `
-                <div class="generated-step">
-                    <h3>📝 ${response.step}</h3>
-                    <div class="step-content">${response.content}</div>
-                    <div class="step-meta">Generated: ${new Date().toLocaleString()}</div>
-                </div>
-            `;
-            editor.innerHTML += stepHTML;
-            socket.emit('doc:update', editor.innerHTML);
+        function optionClicked(option) {
+            alert("You clicked Option " + option);
         }
-        ipcRenderer.send('autosave-document', editor.innerHTML, title.innerText.trim());
-    });
-
-    async function triggerAnalysis() {
-        const analyzeBtn = document.getElementById('analyze-btn');
-        analyzeBtn.disabled = true;
-        analyzeBtn.innerHTML = '🔄 Analyzing...';
-        
-        socket.emit('trigger:analysis', editor.innerHTML);
-        
-        setTimeout(() => {
-            analyzeBtn.disabled = false;
-            analyzeBtn.innerHTML = '🔄 Analyze Document';
-        }, 3000);
-    }
-  </script>
+    </script>
 </body>
 </html>
